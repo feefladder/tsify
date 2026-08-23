@@ -132,7 +132,10 @@ fn test_tsify_container_rename_does_not_change_internal_tag_value() {
 }
 
 #[test]
-fn test_tsify_container_rename_does_not_change_references() {
+fn test_tsify_container_rename_currently_requires_reference_override() {
+    // `rename` names declarations and nothing else. The unannotated and the
+    // annotated reference sit side by side so that #103, if it ever lands,
+    // has to change this expectation on purpose rather than by accident.
     #[derive(Tsify)]
     #[tsify(rename = "PublicConfig")]
     struct Config {
