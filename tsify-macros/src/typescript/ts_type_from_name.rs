@@ -24,9 +24,11 @@ impl TsType {
     /// Create a `TsType` from a stringified Rust identifier.
     pub fn from_name(
         config: &TypeGenerationConfig,
+        path: &syn::Path,
         ident: &str,
         args: Vec<&syn::Type>,
         fn_output: Option<&syn::Type>,
+        generics: &syn::Generics,
     ) -> Self {
         match ident {
             "u8" | "u16" | "u32" | "i8" | "i16" | "i32" | "f64" | "f32" => Self::NUMBER,
@@ -52,18 +54,18 @@ impl TsType {
             "bool" => Self::BOOLEAN,
 
             "Box" | "Cow" | "Rc" | "Arc" | "Cell" | "RefCell" if args.len() == 1 => {
-                Self::from_syn_type(config, args[0])
+                Self::from_syn_type(config, args[0], generics)
             }
 
             "Vec" | "VecDeque" | "LinkedList" if args.len() == 1 => {
-                let elem = Self::from_syn_type(config, args[0]);
+                let elem = Self::from_syn_type(config, args[0], generics);
                 Self::Array(Box::new(elem))
             }
 
             "HashMap" | "BTreeMap" if args.len() == 2 => {
                 let type_params = args
                     .iter()
-                    .map(|arg| Self::from_syn_type(config, arg))
+                    .map(|arg| Self::from_syn_type(config, arg, generics))
                     .collect();
 
                 let name = if cfg!(feature = "js") && !config.hashmap_as_object {
@@ -73,16 +75,20 @@ impl TsType {
                 }
                 .to_string();
 
-                Self::Ref { name, type_params }
+                Self::Ref {
+                    name,
+                    source: super::TsTypeRefSource::Synthetic,
+                    type_params,
+                }
             }
 
             "HashSet" | "BTreeSet" if args.len() == 1 => {
-                let elem = Self::from_syn_type(config, args[0]);
+                let elem = Self::from_syn_type(config, args[0], generics);
                 Self::Array(Box::new(elem))
             }
 
             "Option" if args.len() == 1 => Self::Option(
-                Box::new(Self::from_syn_type(config, args[0])),
+                Box::new(Self::from_syn_type(config, args[0], generics)),
                 NullType::new(config),
             ),
 
@@ -90,6 +96,7 @@ impl TsType {
                 if cfg!(feature = "js") {
                     Self::Ref {
                         name: String::from("Uint8Array"),
+                        source: super::TsTypeRefSource::Synthetic,
                         type_params: vec![],
                     }
                 } else {
@@ -98,8 +105,8 @@ impl TsType {
             }
 
             "Result" if args.len() == 2 => {
-                let arg0 = Self::from_syn_type(config, args[0]);
-                let arg1 = Self::from_syn_type(config, args[1]);
+                let arg0 = Self::from_syn_type(config, args[0], generics);
+                let arg1 = Self::from_syn_type(config, args[1], generics);
 
                 let ok = type_lit! { Ok: arg0 };
                 let err = type_lit! { Err: arg1 };
@@ -120,7 +127,7 @@ impl TsType {
             // Treat as std::ops::Range or std::ops::RangeInclusive only when there is exactly one type parameter.
             // Otherwise, consider it a user-defined type and do not perform any conversion.
             "Range" | "RangeInclusive" if args.len() == 1 => {
-                let start = Self::from_syn_type(config, args[0]);
+                let start = Self::from_syn_type(config, args[0], generics);
                 let end = start.clone();
 
                 type_lit! {
@@ -132,10 +139,10 @@ impl TsType {
             "Fn" | "FnOnce" | "FnMut" => {
                 let params = args
                     .into_iter()
-                    .map(|ty| Self::from_syn_type(config, ty))
+                    .map(|ty| Self::from_syn_type(config, ty, generics))
                     .collect();
                 let type_ann = fn_output
-                    .map(|ty| Self::from_syn_type(config, ty))
+                    .map(|ty| Self::from_syn_type(config, ty, generics))
                     .unwrap_or_else(|| TsType::VOID);
 
                 Self::Fn {
@@ -146,10 +153,19 @@ impl TsType {
             _ => {
                 let type_params = args
                     .into_iter()
-                    .map(|ty| Self::from_syn_type(config, ty))
+                    .map(|ty| Self::from_syn_type(config, ty, generics))
                     .collect();
+                let source = if generics
+                    .type_params()
+                    .any(|param| path.get_ident() == Some(&param.ident))
+                {
+                    super::TsTypeRefSource::TypeParam
+                } else {
+                    super::TsTypeRefSource::Rust(path.clone())
+                };
                 Self::Ref {
                     name: config.format_name(ident.to_string()),
+                    source,
                     type_params,
                 }
             }

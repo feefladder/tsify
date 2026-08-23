@@ -31,7 +31,9 @@ impl Display for TsType {
                 write!(f, "[{elems}]")
             }
 
-            TsType::Ref { name, type_params } => {
+            TsType::Ref {
+                name, type_params, ..
+            } => {
                 let params = type_params
                     .iter()
                     .map(|param| param.to_string())

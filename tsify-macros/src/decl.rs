@@ -4,7 +4,7 @@ use std::{fmt::Display, vec};
 use crate::comments::clean_comments;
 use crate::{
     comments::write_doc_comments,
-    typescript::{TsType, TsTypeElement, TsTypeLit},
+    typescript::{TsType, TsTypeElement, TsTypeLit, TsTypeRefSource},
 };
 
 #[derive(Debug, Clone)]
@@ -121,8 +121,13 @@ fn tparam(i: usize) -> String {
 impl TsEnumDecl {
     fn replace_type_params(ts_type: TsType, type_args: &mut Vec<String>) -> TsType {
         match ts_type {
-            TsType::Ref { name, type_params } => TsType::Ref {
+            TsType::Ref {
                 name,
+                source,
+                type_params,
+            } => TsType::Ref {
+                name,
+                source,
                 type_params: type_params
                     .iter()
                     .map(|_| {
@@ -130,6 +135,7 @@ impl TsEnumDecl {
                         type_args.push(name.clone());
                         TsType::Ref {
                             name,
+                            source: TsTypeRefSource::TypeParam,
                             type_params: Vec::new(),
                         }
                     })
@@ -200,12 +206,13 @@ impl Display for TsEnumDecl {
 
                     type_refs
                         .iter()
-                        .filter(|(name, _)| !self.type_params.contains(name))
-                        .map(|(name, type_args)| {
+                        .filter(|(name, _, _)| !self.type_params.contains(name))
+                        .map(|(name, source, type_args)| {
                             let mut type_refs = Vec::new();
                             let ts_type = TsEnumDecl::replace_type_params(
                                 TsType::Ref {
                                     name: name.clone(),
+                                    source: source.clone(),
                                     type_params: type_args.clone(),
                                 },
                                 &mut type_refs,
@@ -281,6 +288,7 @@ impl Display for TsEnumDecl {
 
                             TsType::Ref {
                                 name,
+                                source: TsTypeRefSource::Synthetic,
                                 type_params: vec![],
                             }
                         } else {

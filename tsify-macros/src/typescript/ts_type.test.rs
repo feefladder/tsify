@@ -6,7 +6,7 @@ macro_rules! assert_ts {
         ($config:expr, $( $t:ty )|* , $expected:expr) => {
           $({
             let ty: syn::Type = syn::parse_quote!($t);
-            let ts_type = TsType::from_syn_type(&$config, &ty);
+            let ts_type = TsType::from_syn_type(&$config, &ty, &syn::Generics::default());
             assert_eq!(ts_type.to_string(), $expected);
           })*
         };
@@ -75,4 +75,35 @@ fn test_basic_types() {
         RangeInclusive<usize>,
         "{ start: number; end: number }"
     );
+}
+
+#[test]
+fn test_rust_type_ref_keeps_path() {
+    let config = TypeGenerationConfig::default();
+    let ty: syn::Type = syn::parse_quote!(a::Config<String>);
+    let expected_path: syn::Path = syn::parse_quote!(a::Config<String>);
+
+    let ts_type = TsType::from_syn_type(&config, &ty, &syn::Generics::default());
+
+    assert!(matches!(
+        ts_type,
+        TsType::Ref {
+            name,
+            source: super::TsTypeRefSource::Rust(path),
+            ..
+        } if name == "Config" && path == expected_path
+    ));
+
+    let ty: syn::Type = syn::parse_quote!(T);
+    let generics: syn::Generics = syn::parse_quote!(<T>);
+    let ts_type = TsType::from_syn_type(&config, &ty, &generics);
+
+    assert!(matches!(
+        ts_type,
+        TsType::Ref {
+            name,
+            source: super::TsTypeRefSource::TypeParam,
+            ..
+        } if name == "T"
+    ));
 }

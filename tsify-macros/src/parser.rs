@@ -213,7 +213,11 @@ impl<'a> Parser<'a> {
             }
         };
 
-        let type_ann = TsType::from_syn_type(&self.container.attrs.ty_config, field.ty);
+        let type_ann = TsType::from_syn_type(
+            &self.container.attrs.ty_config,
+            field.ty,
+            self.container.generics(),
+        );
 
         if let Some(t) = &ts_attrs.type_override {
             let type_params = if let Some(params) = &ts_attrs.type_params {

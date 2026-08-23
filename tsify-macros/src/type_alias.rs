@@ -10,7 +10,11 @@ use crate::{
 pub fn expand(item: syn::ItemType) -> syn::Result<TokenStream> {
     let errors = ErrorTracker::new();
 
-    let type_ann = TsType::from_syn_type(&TypeGenerationConfig::default(), item.ty.as_ref());
+    let type_ann = TsType::from_syn_type(
+        &TypeGenerationConfig::default(),
+        item.ty.as_ref(),
+        &item.generics,
+    );
 
     let decl = TsTypeAliasDecl {
         id: item.ident.to_string(),
