@@ -16,6 +16,58 @@ pub use gloo_utils::format::JsValueSerdeExt;
 #[cfg(feature = "js")]
 pub use serde_wasm_bindgen;
 pub use tsify_macros::*;
+
+/// The `declare` macro, used in `#[declare]` annotations.
+///
+///
+///
+/// ## Examples
+///
+/// ```
+/// # use wasm_bindgen::prelude::*;
+/// use tsify::{declare, Tsify, Ts};
+/// use serde::{Deserialize, Serialize};
+///
+/// #[declare]
+/// pub type Foo = (i32, String);
+///
+/// #[derive(Tsify, Serialize)]
+/// pub struct Bar(pub Vec<Foo>);
+///
+/// #[wasm_bindgen]
+/// pub fn returns_bar() -> Result<Ts<Bar>, JsError> {
+///     Ok(Bar(vec![(42, "forty two".to_string())]).into_ts()?)
+/// }
+/// ```
+///
+/// which generates the following ts:
+/// ```ts
+/// /* tslint:disable */
+/// /* eslint-disable */
+/// export type Bar = Foo[];
+///
+/// export type Foo = [number, string];
+///
+///
+/// export function returns_bar(): Bar;
+///
+/// ```
+///
+/// The following is currently not possible:
+///
+/// ```compile_fail
+/// #[declare]
+/// pub type Foo = (i32, String)
+///
+/// #[wasm_bindgen]
+/// pub fn returns_foo() -> Ts<Vec<Foo>>
+/// ```
+///
+/// In stead, create a wrapper struct for every distinct return type as shown
+/// above.
+///
+pub use tsify_macros::declare;
+
 #[cfg(feature = "wasm-bindgen")]
 use wasm_bindgen::{JsCast, JsValue};
 
