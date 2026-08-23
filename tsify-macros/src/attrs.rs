@@ -9,7 +9,7 @@ pub struct TsifyContainerAttrs {
     pub type_override: Option<String>,
     pub type_params: Option<Vec<String>>,
     /// Override the name of the generated Typescript declaration.
-    pub declaration_name: Option<String>,
+    pub rename: Option<String>,
     /// Implement `IntoWasmAbi` for the type.
     pub into_wasm_abi: bool,
     /// Implement `FromWasmAbi` for the type.
@@ -52,11 +52,11 @@ impl TypeGenerationConfig {
 
 impl TsifyContainerAttrs {
     pub fn from_derive_input(input: &syn::DeriveInput) -> syn::Result<Self> {
-        let mut declaration_name_span = None;
+        let mut rename_span = None;
         let mut attrs = Self {
             type_override: None,
             type_params: None,
-            declaration_name: None,
+            rename: None,
             into_wasm_abi: false,
             from_wasm_abi: false,
             from_wasm_abi_span: None,
@@ -89,20 +89,20 @@ impl TsifyContainerAttrs {
                     return Ok(());
                 }
 
-                if meta.path.is_ident("declaration_name") {
-                    if attrs.declaration_name.is_some() {
+                if meta.path.is_ident("rename") {
+                    if attrs.rename.is_some() {
                         return Err(meta.error("duplicate attribute"));
                     }
                     let lit = meta.value()?.parse::<syn::LitStr>()?;
-                    let declaration_name = lit.value();
-                    if !is_ts_identifier(&declaration_name) {
+                    let rename = lit.value();
+                    if !is_ts_identifier(&rename) {
                         return Err(syn::Error::new(
                             lit.span(),
-                            "`declaration_name` must be a valid TypeScript identifier",
+                            "`rename` must be a valid TypeScript identifier",
                         ));
                     }
-                    attrs.declaration_name = Some(declaration_name);
-                    declaration_name_span = Some(meta.path.span());
+                    attrs.rename = Some(rename);
+                    rename_span = Some(meta.path.span());
                     return Ok(());
                 }
 
@@ -192,16 +192,16 @@ impl TsifyContainerAttrs {
                     return Ok(());
                 }
 
-                Err(meta.error("unsupported tsify attribute, expected one of `type`, `type_params`, `declaration_name`, `into_wasm_abi`, `from_wasm_abi`, `namespace`, `type_prefix`, `type_suffix`, `missing_as_null`, `hashmap_as_object`, `large_number_types_as_bigints`"))
+                Err(meta.error("unsupported tsify attribute, expected one of `type`, `type_params`, `rename`, `into_wasm_abi`, `from_wasm_abi`, `namespace`, `type_prefix`, `type_suffix`, `missing_as_null`, `hashmap_as_object`, `large_number_types_as_bigints`"))
             })?;
         }
 
-        if attrs.declaration_name.is_some()
+        if attrs.rename.is_some()
             && (attrs.ty_config.type_prefix.is_some() || attrs.ty_config.type_suffix.is_some())
         {
             return Err(syn::Error::new(
-                declaration_name_span.unwrap_or_else(Span::call_site),
-                "`declaration_name` cannot be combined with `type_prefix` or `type_suffix`",
+                rename_span.unwrap_or_else(Span::call_site),
+                "`rename` cannot be combined with `type_prefix` or `type_suffix`",
             ));
         }
 
